@@ -70,6 +70,23 @@ Open http://localhost:5173.
 | **Offline pocket pass**: printable itinerary with Plan Bs and helplines | 🖨️ Pocket pass | Usability |
 | **Late-night safety**: arrivals after 22:00 get a verified cab and a live-trip share note | Last transfer | Usability |
 
+### Plan together & travel companion
+
+| Feature | Where | How it works |
+|---|---|---|
+| **AI trip assistant** | Home + 🤖 Assistant tab | One-line requests ("family of 4, 2 days, ₹30k, veg, no long walks") become a full door-to-door plan preview; in a trip it handles "train 2h late", "it's raining", "skip / add / swap X", "how do I get from A to B", "show day 2", "budget". Every answer runs through the planner, so it cannot invent times or prices. Offline rule brain today; an LLM plugs into the same tools (`backend/app/engine/llm.py`, key in `backend/.env`). |
+| **Preferences** | Avatar menu → Preferences | Interests, pace, diet (any/veg/Jain), walking (limited = no stair-heavy forts, short walks, cabs on hills), stay indoors 12–16, day start/end. Saved per user; "Save & re-plan" rebuilds the trip around them. |
+| **Sharing & members** | 💬 Group tab | Add a friend directly or share an invite code / link (`?join=CODE`). Members see everything; receipt split per member. |
+| **Group chat & polls** | 💬 Group tab | Every re-plan posts itself with the engine's explanation. "Swap X for its Plan B?" polls apply the swap on a majority yes. `@ai` answers inside the thread. Live over a WebSocket. |
+| **Ticket wallet** | 🎫 Wallet | Package tickets (train PNR, hotel voucher, entry tickets with QR) generated from the plan with live status ("running 180 min late", "moved to Day 2"), plus uploaded PDFs/photos. |
+| **Memories** | 📸 Memories | Photo + caption pinned to a stop; shown in the journal. |
+| **Journal** | 📓 Journal | One page per day, drafted from the day's plan, changes and memories; mood; private or shared. |
+| **Calendar** | 📅 Calendar | Month + day agenda, `.ics` export with alerts, and a **live subscription feed** (`/api/trips/{id}/calendar.ics`): when the plan re-heals, the phone calendar follows. |
+| **Trip mode** | 🧭 Start trip mode | One-screen companion: now / next / leave-in countdown, the ticket you need, Running late (re-plans), Done, Skip, Plan B, Add memory, Share status, location check. |
+| **Demo identities** | Login | One click as Priya / Rohit / Ananya / Kabir, remembered per browser tab. Two windows = two friends on the same trip. |
+
+The `frontend-only` branch has the same screens with everything in the browser (localStorage + IndexedDB, live sync between tabs). Both branches produce identical plans (126 scenarios checked).
+
 ## How the engine works
 
 ```
@@ -110,15 +127,27 @@ The engine is deterministic and rule-based, so it never breaks during a demo, an
 | GET / PUT | `/api/learning`, `/api/learning/weights` | Model state, judge weight sliders |
 | POST | `/api/learning/simulate` | Synthetic seeder: holdout accuracy & corridor error before/after (`apply` to persist) |
 | POST | `/api/learning/reset` | Reset learned weights and buffers |
+| GET / POST / PUT | `/api/users`, `/api/users/{id}/prefs`, `/api/users/{id}/trips` | Demo identities, preferences, a user's trips |
+| POST | `/api/trips/{id}/pin`, `/prefs`, `/mode` | Add a stop, apply preferences, trip mode on/off |
+| POST / DELETE | `/api/trips/{id}/members`, `/api/join` | Add/remove members, join by invite code |
+| GET / POST | `/api/trips/{id}/messages`, `/polls`, `/messages/{mid}/vote` | Group chat, polls (swap polls apply themselves) |
+| POST | `/api/agent` | Trip assistant (plan, re-plan, places, ride options) |
+| GET / POST / DELETE | `/api/trips/{id}/tickets`, `/memories`, `/api/files/{id}` | Wallet, memories, stored files |
+| GET / PUT | `/api/trips/{id}/journal` | Journal entries (own + shared) |
+| GET | `/api/trips/{id}/calendar.ics` | Live calendar subscription |
+| WS | `/api/ws` | Live update events for every open screen |
 
-## 4-minute demo script
+## 5-minute demo script
 
-1. **Problem (30 s)**: the landing page's "domino effect" card: 3 h late → hotel detour → City Palace closed → tickets wasted.
-2. **Plan (40 s)**: click *Family Weekend*. Show the journey strip (leave home 04:35 → home 23:45) and the one-package receipt.
-3. **Disrupt (60 s)**: Train **+3h**. Banner: cloakroom drop, a flagship moved to Day 2, money saved, must-see kept vs a static plan. Map: grey dashed original route vs blue new route.
-4. **More real life (40 s)**: **42°C heat** swaps outdoor stops for indoor ones and AC cabs. **Day 2 +3h** drops low-value stops to protect the return train.
-5. **Plan B & learning (40 s)**: one-tap Plan B swap; mark a stop Kept/Skipped; log an actual ride time.
-6. **Judge AI (30 s)**: static vs DelayProof, weight sliders, *Run simulation*: holdout accuracy climbs (≈69% → 81%) and ride-time error drops (≈7.0 → 3.1 min).
+Open two browser windows side by side: window A as **Priya**, window B as **Rohit**.
+
+1. **Problem (20 s)**: the "domino effect" card: 3 h late → hotel detour → City Palace closed → tickets wasted.
+2. **Plan by chat (45 s)**: in A, type *"Family of 4, 2 days, ₹30k, we love history and food, no long walks for my parents"*. The plan card shows leave-home time, every stop and the all-in cost; Priya's saved veg preference is applied. *Create it*.
+3. **Plan together (40 s)**: Group tab → add Rohit. In B, Rohit sees the trip appear. Create a Plan B swap poll; Rohit votes in B, Priya votes in A: the swap applies itself and both chats update live.
+4. **Disrupt (50 s)**: Assistant: *"our train is 3 hours late"*. Banner: cloakroom drop, a flagship moved to Day 2, money saved. The group chat and the wallet (train ticket "running 180 min late") update on their own; the subscribed calendar follows.
+5. **Trip mode (45 s)**: start Trip mode: now / next / leave-in countdown, the ticket you need, *Running late +30* re-plans, add a memory, share status to the group.
+6. **Memories & journal (30 s)**: the memory shows on the wall; Journal → *Draft from my day* writes the day from the plan, the delay and the memory.
+7. **Judge AI (30 s)**: static vs DelayProof, weight sliders, *Run simulation*: holdout accuracy climbs (≈69% → 81%) and ride-time error drops (≈7.0 → 3.1 min).
 
 ## Mock vs real
 

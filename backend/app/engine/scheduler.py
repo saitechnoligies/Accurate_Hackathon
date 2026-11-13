@@ -46,7 +46,11 @@ def normalize_disruptions(d: dict | None) -> dict:
         "skipped": list(d.get("skipped") or []),           # attractions the traveller skipped
         "swaps": dict(d.get("swaps") or {}),               # original id -> plan B id
         "swap_days": {k: int(v) for k, v in (d.get("swap_days") or {}).items()},  # plan B id -> day it replaces
+        "pins": list(d.get("pins") or []),                 # stops the traveller asked to add
     }
+
+
+LIMITED_WALK_KM = 0.5
 
 
 def overlaps(a0, a1, b0, b1) -> bool:
@@ -69,7 +73,8 @@ class Planner:
         self.n = 0
         self.visited: set[str] = set()
         self.excluded = set(self.d["skipped"]) | set(self.d["swaps"].keys())
-        self.pinned = set(self.d["swaps"].values())
+        self.pinned = set(self.d["swaps"].values()) | set(self.d["pins"])
+        self.limited = profile.get("mobility") == "limited"
         self.ledger = {k: 0 for k in ["train", "stay", "home_transfers", "local_rides", "tickets", "meals", "extras"]}
         self.events: list[dict] = []   # engine decisions used for the explanation banner
         self.hotel = {"name": self.stay["name"], "lat": self.stay["lat"], "lng": self.stay["lng"], "zone": self.stay["zone"]}
@@ -88,7 +93,8 @@ class Planner:
 
     def modes_at(self, t: float) -> list[str]:
         modes = [m for m in self.p["modes"] if m != "walk"]
-        if self.d["weather"] in ("heat", "rain") and "cab" in modes and (self.d["weather"] == "rain" or HEAT[0] <= t <= HEAT[1]):
+        wx = self.d["weather"]
+        if "cab" in modes and (self.limited or (wx in ("heat", "rain") and (wx == "rain" or HEAT[0] <= t <= HEAT[1]))):
             modes = ["cab"] + [m for m in modes if m != "cab"]
         return modes
 
@@ -97,7 +103,7 @@ class Planner:
         if "walk" in self.p["modes"] and not (self.d["weather"] == "heat" and HEAT[0] <= t <= HEAT[1]) \
                 and self.d["weather"] != "rain":
             w = travel(a, b, "walk", self.trav, self.corr)
-            if w:
+            if w and not (self.limited and w["km"] > LIMITED_WALK_KM):
                 return [w]
         for m in self.modes_at(t):
             leg = travel(a, b, m, self.trav, self.corr)
@@ -178,8 +184,20 @@ class Planner:
             return True
         if self.d["weather"] == "rain":
             return False
-        if self.d["weather"] == "heat" and overlaps(start, end, *HEAT):
+        if (self.d["weather"] == "heat" or self.p.get("avoid_heat")) and overlaps(start, end, *HEAT):
             return False
+        return True
+
+    def accessible(self, a: dict) -> bool:
+        """Limited mobility skips stair-heavy places unless the traveller pinned them."""
+        return not (self.limited and a.get("stairs") and a["id"] not in self.pinned)
+
+    def diet_ok(self, a: dict) -> bool:
+        diet = self.p.get("diet") or "any"
+        if diet == "jain":
+            return bool(a.get("jain"))
+        if diet == "veg":
+            return a.get("veg") is not False
         return True
 
     def evaluate(self, a: dict, t: float, loc: dict, deadline, max_wait: int = 45) -> dict | None:
@@ -231,7 +249,7 @@ class Planner:
         days = self.d["swap_days"]
         return [a for a in self.cat["attractions"]
                 if a["kind"] == "visit" and a["id"] not in self.visited and a["id"] not in self.excluded
-                and days.get(a["id"], self.cur_day) == self.cur_day]
+                and days.get(a["id"], self.cur_day) == self.cur_day and self.accessible(a)]
 
     def add_stop(self, day: int, items: list, c: dict, loc: dict):
         a = c["a"]
@@ -266,7 +284,8 @@ class Planner:
             if not had_lunch and t >= LUNCH[0] - 30:
                 had_lunch = True
                 if t <= LUNCH[1]:
-                    meals = [self.evaluate(a, t, loc, deadline) for a in self.cat["attractions"] if a["kind"] == "meal"]
+                    meals = [self.evaluate(a, t, loc, deadline) for a in self.cat["attractions"]
+                             if a["kind"] == "meal" and self.diet_ok(a)]
                     meals = [m for m in meals if m and m["start"] <= LUNCH[1]]
                     if meals:
                         best = max(meals, key=lambda m: m["score"])
@@ -490,7 +509,7 @@ class Planner:
                 best = None
                 for alt in self.cat["attractions"]:
                     if alt["kind"] != "visit" or alt["id"] in in_trip or alt["id"] in self.excluded \
-                            or alt["id"] in used_backups:
+                            or alt["id"] in used_backups or not self.accessible(alt):
                         continue
                     c = self.evaluate(alt, depart, prev_place, lambda _p: 10_000, max_wait=20)
                     if not c:

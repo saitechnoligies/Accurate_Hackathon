@@ -20,7 +20,7 @@ RECEIPT_LABELS = [
 
 def live_only(d: dict) -> dict:
     """User edits (skips, swaps) are part of the baseline; live disruptions are not."""
-    return {"skipped": d["skipped"], "swaps": d["swaps"], "swap_days": d["swap_days"]}
+    return {"skipped": d["skipped"], "swaps": d["swaps"], "swap_days": d["swap_days"], "pins": d["pins"]}
 
 
 def has_live(d: dict) -> bool:

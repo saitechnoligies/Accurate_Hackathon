@@ -77,6 +77,11 @@ async def seed(force: bool = False):
         )
     if force:
         await d.feedback.delete_many({})
+    from .data.users import DEMO_USERS  # demo identities: create once, keep edited preferences
+
+    for u in DEMO_USERS:
+        if not await d.users.find_one({"_id": u["id"]}):
+            await d.users.insert_one({**u, "_id": u["id"]})
 
 
 async def load_catalog() -> dict:

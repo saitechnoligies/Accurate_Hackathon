@@ -28,9 +28,12 @@ def make_profile(catalog: dict, persona_id: str, overrides: dict | None = None) 
         "day_end": persona["day_end"],
         "home": dict(HOMES[persona_id]),
         "start_date": (date.today() + timedelta(days=7)).isoformat(),
+        "diet": "any",
+        "mobility": "normal",
+        "avoid_heat": False,
     }
     for key in ("travelers", "budget", "days", "interests", "pace", "stay_id", "train_class", "outbound", "return",
-                "start_date"):
+                "start_date", "diet", "mobility", "avoid_heat", "day_start", "day_end"):
         if key in o:
             profile[key] = o[key]
     if "home_label" in o:
@@ -38,4 +41,21 @@ def make_profile(catalog: dict, persona_id: str, overrides: dict | None = None) 
     profile["days"] = max(2, min(3, int(profile["days"])))
     profile["travelers"] = max(1, min(8, int(profile["travelers"])))
     profile["budget"] = max(1000, int(profile["budget"]))
+    if profile["pace"] not in ("relaxed", "balanced", "packed"):
+        profile["pace"] = persona["pace"]
+    if profile["mobility"] == "limited" and "cab" not in profile["modes"]:
+        profile["modes"].append("cab")
     return profile
+
+
+def prefs_to_profile(profile: dict, p: dict) -> None:
+    """Apply a user's saved preferences to an existing trip profile (re-plans it)."""
+    if p.get("interests"):
+        profile["interests"] = list(p["interests"])
+    for k in ("pace", "diet", "mobility", "day_start", "day_end"):
+        if p.get(k):
+            profile[k] = p[k]
+    if p.get("avoid_heat") is not None:
+        profile["avoid_heat"] = bool(p["avoid_heat"])
+    if profile.get("mobility") == "limited" and "cab" not in profile["modes"]:
+        profile["modes"] = [*profile["modes"], "cab"]
