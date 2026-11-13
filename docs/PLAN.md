@@ -38,3 +38,20 @@ The screens (`frontend/src/components`) are the same on both branches. Only `src
 
 One-click demo users (Priya, Rohit, Ananya, Kabir), remembered per browser tab. Two windows = two friends on the
 same trip, chatting and voting live.
+
+## Round 2: ideas adopted from YatraBuddy (improved for our door-to-door engine)
+
+| From YatraBuddy | How it works here |
+|---|---|
+| Open-Meteo weather + air quality | Forecast for the exact trip dates feeds proactive suggestions that re-plan the trip, not just a weather card |
+| Proactive trigger cards (budget, weather, crowd) | Same accept / dismiss / mute pattern, but every accept is an engine action (heat/rain plan, drop a stop, Plan B swap, packing) |
+| Trust badges (live / cached / simulated) | On every live figure, with source and fetch time |
+| Wikimedia place photos | Wikipedia thumbnails on stops, assistant cards, Guide and Trip mode, with source links |
+| Wikivoyage city briefing | Guide tab excerpts under CC BY-SA, offline notes fallback, plus helplines |
+| Voice input, spoken replies, reminders | Mic in assistant and group chat; reminders by voice or one tap in Trip mode |
+| Packing list (per device) | Shared by the group with assignees, suggested from the plan and forecast |
+| Expenses + budget chart | Who-paid / who-shares, fewest-transfer settle-up, spending by day vs plan |
+| Provider hand-offs (IRCTC, Uber, Booking.com…) | Context-aware: per timeline step, per ticket, next ride in Trip mode |
+| Service worker | Installable app shell + map tile cache |
+
+Not adopted: Google/Firebase sign-in, worldwide city search, news feed, fuel calculator, hosted-LLM chat (out of scope for an offline, deterministic Jaipur demo).

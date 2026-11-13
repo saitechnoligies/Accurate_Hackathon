@@ -1,0 +1,11 @@
+﻿{
+  "name": "DelayProof Trip",
+  "short_name": "DelayProof",
+  "description": "Door-to-door, self-healing trip planner",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6fb",
+  "theme_color": "#0f1d4d",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

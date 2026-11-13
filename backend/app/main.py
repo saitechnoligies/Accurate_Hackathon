@@ -508,7 +508,8 @@ async def delete_trip(trip_id: str, user_id: str):
     trip = await get_trip(trip_id)
     if trip["owner_id"] == user_id:
         await D().trips.delete_one({"_id": trip_id})
-        await D().messages.delete_many({"trip_id": trip_id})
+        for coll in ("messages", "packing", "expenses", "tickets", "memories", "journal"):
+            await D()[coll].delete_many({"trip_id": trip_id})
     else:
         await save_trip(trip, members=[m for m in trip["members"] if m["user_id"] != user_id])
     await hub.emit({"type": "trips"})
@@ -876,6 +877,124 @@ async def save_journal(trip_id: str, req: JournalReq):
     await D().journal.update_one({"_id": f"{trip_id}|{req.day}|{req.user_id}"}, {"$set": rec}, upsert=True)
     await hub.emit({"type": "journal", "trip_id": trip_id})
     return rec
+
+
+# --------------------------------------------------------------------------- packing (shared by the group)
+class PackItemIn(BaseModel):
+    text: str = Field(min_length=1, max_length=80)
+    category: str = "Other"
+    why: str | None = None
+
+
+class PackingReq(BaseModel):
+    user_id: str
+    items: list[PackItemIn]
+
+
+class PackPatch(BaseModel):
+    done_by: str | None = None
+    assignee: str | None = None
+    fields: list[str] = Field(default_factory=list)
+
+
+async def packing_list(trip_id: str) -> list[dict]:
+    return [clean(p) for p in await D().packing.find({"trip_id": trip_id}).sort("at", 1).to_list(500)]
+
+
+@app.get("/api/trips/{trip_id}/packing")
+async def packing(trip_id: str):
+    return await packing_list(trip_id)
+
+
+@app.post("/api/trips/{trip_id}/packing")
+async def add_packing(trip_id: str, req: PackingReq):
+    await get_trip(trip_id)
+    have = {p["text"].lower() for p in await packing_list(trip_id)}
+    fresh = [i for i in req.items if i.text.strip() and i.text.strip().lower() not in have]
+    if fresh:
+        await D().packing.insert_many([{"_id": new_id(), "trip_id": trip_id, "text": i.text.strip(), "category": i.category or "Other",
+                                        "why": i.why, "added_by": req.user_id, "at": now()} for i in fresh])
+    if len(fresh) > 1:
+        await system(trip_id, f"🧳 {await user_name(req.user_id)} added {len(fresh)} items to the packing list.")
+        await hub.emit({"type": "messages", "trip_id": trip_id})
+    await hub.emit({"type": "packing", "trip_id": trip_id})
+    return await packing_list(trip_id)
+
+
+@app.patch("/api/trips/{trip_id}/packing/{item_id}")
+async def update_packing(trip_id: str, item_id: str, req: PackPatch):
+    fields = {k: getattr(req, k) for k in ("done_by", "assignee") if k in req.fields}
+    if fields:
+        r = await D().packing.update_one({"_id": item_id, "trip_id": trip_id}, {"$set": fields})
+        if not r.matched_count:
+            raise HTTPException(404, "Item not found")
+    await hub.emit({"type": "packing", "trip_id": trip_id})
+    return await packing_list(trip_id)
+
+
+@app.delete("/api/trips/{trip_id}/packing/{item_id}")
+async def delete_packing(trip_id: str, item_id: str):
+    await D().packing.delete_one({"_id": item_id, "trip_id": trip_id})
+    await hub.emit({"type": "packing", "trip_id": trip_id})
+    return await packing_list(trip_id)
+
+
+# --------------------------------------------------------------------------- expenses & settle-up
+class ExpenseReq(BaseModel):
+    user_id: str
+    title: str = Field(min_length=1, max_length=60)
+    amount: float = Field(gt=0, le=1_000_000)
+    paid_by: str
+    split: list[str] = Field(default_factory=list)
+    day: int = 1
+    category: Literal["package", "extra"] = "extra"
+
+
+async def expense_list(trip_id: str) -> list[dict]:
+    return [clean(e) for e in await D().expenses.find({"trip_id": trip_id}).sort("at", 1).to_list(1000)]
+
+
+@app.get("/api/trips/{trip_id}/expenses")
+async def expenses(trip_id: str):
+    return await expense_list(trip_id)
+
+
+@app.post("/api/trips/{trip_id}/expenses")
+async def add_expense(trip_id: str, req: ExpenseReq):
+    trip = await get_trip(trip_id)
+    split = req.split or [m["user_id"] for m in trip["members"]]
+    await D().expenses.insert_one({"_id": new_id(), "trip_id": trip_id, "title": req.title, "amount": req.amount,
+                                   "paid_by": req.paid_by, "split": split, "day": req.day, "category": req.category, "at": now()})
+    if req.category == "extra":
+        logged = f", logged by {await user_name(req.user_id)}" if req.user_id != req.paid_by else ""
+        await system(trip_id, f"💸 {await user_name(req.paid_by)} paid ₹{round(req.amount):,} for {req.title} "
+                              f"(split {len(split)} way{'s' if len(split) > 1 else ''}){logged}.")
+        await hub.emit({"type": "messages", "trip_id": trip_id})
+    await hub.emit({"type": "expenses", "trip_id": trip_id})
+    return await expense_list(trip_id)
+
+
+@app.post("/api/trips/{trip_id}/expenses/package")
+async def add_package_expenses(trip_id: str, req: UserReq):
+    trip = await get_trip(trip_id)
+    view = await trip_view(trip)
+    members = [m["user_id"] for m in trip["members"]]
+    await D().expenses.delete_many({"trip_id": trip_id, "category": "package"})
+    docs = [{"_id": new_id(), "trip_id": trip_id, "title": ln["label"], "amount": ln["amount"], "paid_by": req.user_id,
+             "split": members, "day": 1, "category": "package", "at": now()} for ln in view["receipt"]["lines"] if ln["amount"] > 0]
+    if docs:
+        await D().expenses.insert_many(docs)
+    await system(trip_id, f"🧾 {await user_name(req.user_id)} paid the package (₹{view['receipt']['total']:,}); "
+                          f"it is now split across {len(members)} members.")
+    await hub.emit({"type": "expenses", "trip_id": trip_id}, {"type": "messages", "trip_id": trip_id})
+    return await expense_list(trip_id)
+
+
+@app.delete("/api/trips/{trip_id}/expenses/{eid}")
+async def delete_expense(trip_id: str, eid: str):
+    await D().expenses.delete_one({"_id": eid, "trip_id": trip_id})
+    await hub.emit({"type": "expenses", "trip_id": trip_id})
+    return await expense_list(trip_id)
 
 
 # --------------------------------------------------------------------------- live calendar feed

@@ -1,7 +1,7 @@
 // Full-stack adapter: the same operations as the in-browser store on the frontend-only branch, served by
 // FastAPI + MongoDB. Live updates arrive over a WebSocket.
 import type {
-  AgentReply, AgentState, Disruptions, JournalEntry, LearningState, Memory, Message, Meta, Poll, Prefs, SimResult,
+  AgentReply, AgentState, Disruptions, Expense, JournalEntry, LearningState, Memory, Message, Meta, PackItem, Poll, Prefs, SimResult,
   Ticket, Trip, TripEvent, TripSummary, User,
 } from './types'
 
@@ -126,6 +126,21 @@ export const api = {
   deleteMemory: (id: string, mid: string) => del<boolean>(`/trips/${id}/memories/${mid}`),
   journal: (id: string, uid: string) => call<JournalEntry[]>(`/trips/${id}/journal?user_id=${encodeURIComponent(uid)}`),
   saveJournal: (e: Omit<JournalEntry, 'updated_at'>) => put<JournalEntry>(`/trips/${e.trip_id}/journal`, e),
+
+  // packing (shared by the group)
+  packing: (id: string) => call<PackItem[]>(`/trips/${id}/packing`),
+  addPacking: (id: string, uid: string, items: Pick<PackItem, 'text' | 'category' | 'why'>[]) =>
+    post<PackItem[]>(`/trips/${id}/packing`, { user_id: uid, items }),
+  updatePacking: (id: string, itemId: string, patch: Partial<Pick<PackItem, 'done_by' | 'assignee'>>) =>
+    call<PackItem[]>(`/trips/${id}/packing/${itemId}`, { method: 'PATCH', body: JSON.stringify({ done_by: patch.done_by ?? null, assignee: patch.assignee ?? null, fields: Object.keys(patch) }) }),
+  deletePacking: (id: string, itemId: string) => del<PackItem[]>(`/trips/${id}/packing/${itemId}`),
+
+  // expenses & settle-up
+  expenses: (id: string) => call<Expense[]>(`/trips/${id}/expenses`),
+  addExpense: (id: string, uid: string, e: Omit<Expense, 'id' | 'trip_id' | 'at'>) =>
+    post<Expense[]>(`/trips/${id}/expenses`, { user_id: uid, ...e }),
+  addPackageExpenses: (id: string, uid: string) => post<Expense[]>(`/trips/${id}/expenses/package`, { user_id: uid }),
+  deleteExpense: (id: string, eid: string) => del<Expense[]>(`/trips/${id}/expenses/${eid}`),
 
   /** Live calendar feed: rebuilt from the current plan on every refresh. */
   calendarUrl: (id: string): string | null => `${location.origin}/api/trips/${id}/calendar.ics`,

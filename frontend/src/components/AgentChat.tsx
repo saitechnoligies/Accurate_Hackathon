@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import type { AgentCard, AgentState, Trip, User } from '../types'
+import { addReminder, parseReminder, speak } from '../voice'
+import { MicButton } from './live'
 import { AgentCards } from './ui'
 
 type Turn = { who: 'me' | 'ai'; text: string; cards?: AgentCard[]; suggestions?: string[] }
@@ -29,6 +31,7 @@ export default function AgentChat({ user, trip, onTrip, onCreated, compact }: {
   const [text, setText] = useState('')
   const [thinking, setThinking] = useState(false)
   const [brain, setBrain] = useState<string>('offline')
+  const [voice, setVoice] = useState(false)
   const end = useRef<HTMLDivElement>(null)
 
   useEffect(() => { api.settings().then((s) => setBrain(s.ai_brain)).catch(() => {}) }, [])
@@ -38,11 +41,21 @@ export default function AgentChat({ user, trip, onTrip, onCreated, compact }: {
     if (!q.trim() || thinking) return
     setTurns((t) => [...t, { who: 'me', text: q }])
     setText('')
+    const rem = parseReminder(q)
+    if (rem) {
+      addReminder(rem)
+      const mins = Math.round((rem.due - Date.now()) / 60000)
+      const msg = `Okay, I'll remind you to ${rem.label} in ${mins} minute${mins === 1 ? '' : 's'} (while this app is open).`
+      setTurns((t) => [...t, { who: 'ai', text: msg }])
+      if (voice) speak(msg)
+      return
+    }
     setThinking(true)
     try {
       const r = await api.agent(q, { user_id: user.id, trip_id: trip?.trip_id, state })
       setState(r.state)
       setTurns((t) => [...t, { who: 'ai', text: r.reply, cards: r.cards, suggestions: r.suggestions }])
+      if (voice) speak(r.reply)
       if (r.trip && trip && onTrip) onTrip(r.trip)
       if (r.created_trip_id && onCreated) setTimeout(() => onCreated(r.created_trip_id!), 900)
     } catch (e) {
@@ -61,6 +74,11 @@ export default function AgentChat({ user, trip, onTrip, onCreated, compact }: {
           <b>Trip assistant</b>
           <div className="small muted">{brain === 'llm' ? 'LLM brain selected · offline rules active' : 'Offline rule brain · runs on the planning engine'}</div>
         </div>
+        {'speechSynthesis' in window && (
+          <label className="small voice-toggle" title="Read replies aloud">
+            <input type="checkbox" checked={voice} onChange={(e) => { setVoice(e.target.checked); if (!e.target.checked) window.speechSynthesis.cancel() }} /> 🔊 Speak replies
+          </label>
+        )}
       </div>
       <div className="chat-log" aria-live="polite">
         {turns.map((t, i) => (
@@ -80,7 +98,8 @@ export default function AgentChat({ user, trip, onTrip, onCreated, compact }: {
         </div>
       )}
       <form className="chat-input" onSubmit={(e) => { e.preventDefault(); ask(text) }}>
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder={trip ? 'e.g. skip Jal Mahal, add Albert Hall, train 3h late…' : 'e.g. 2 days with my parents, veg, ₹30k, no long walks'} aria-label="Message the assistant" />
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder={trip ? 'e.g. skip Jal Mahal, train 3h late, remind me to buy water in 10 minutes' : 'e.g. 2 days with my parents, veg, ₹30k, no long walks'} aria-label="Message the assistant" />
+        <MicButton onText={(t) => ask(t)} title="Ask by voice" />
         <button className="btn btn-primary" disabled={thinking || !text.trim()}>Send</button>
       </form>
     </section>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { autoTickets, fileToDataUrl, qrCells } from '../features'
+import { IRCTC, NTES, bookingCom } from '../handoffs'
 import type { Ticket, Trip, User } from '../types'
 import { Empty, Modal } from './ui'
 
@@ -57,7 +58,7 @@ export default function Wallet({ trip, user, users, notify }: {
       {all.length === 0 && <Empty icon="🎫" title="No tickets yet" />}
       {open && (
         <Modal title={open.title} onClose={() => setOpen(null)}>
-          <TicketDetail t={open} onDelete={open.auto ? undefined : async () => { await api.deleteTicket(id, open.id); setOpen(null); load() }} />
+          <TicketDetail t={open} trip={trip} onDelete={open.auto ? undefined : async () => { await api.deleteTicket(id, open.id); setOpen(null); load() }} />
         </Modal>
       )}
       {adding && <AddTicket trip={trip} onClose={() => setAdding(false)} onAdd={async (t) => {
@@ -72,7 +73,7 @@ export default function Wallet({ trip, user, users, notify }: {
   )
 }
 
-function TicketDetail({ t, onDelete }: { t: Ticket; onDelete?: () => void }) {
+function TicketDetail({ t, trip, onDelete }: { t: Ticket; trip?: Trip; onDelete?: () => void }) {
   const cells = qrCells(t.code ?? t.id)
   const isImg = t.file?.startsWith('data:image') || /\.(png|jpe?g|webp)$/i.test(t.file_name ?? '')
   return (
@@ -91,6 +92,15 @@ function TicketDetail({ t, onDelete }: { t: Ticket; onDelete?: () => void }) {
         </figure>
       )}
       {t.auto && <p className="small muted">Mock booking from the package. In production this comes from IRCTC / the hotel / ASI e-tickets.</p>}
+      {t.auto && t.kind === 'train' && (
+        <div className="row-gap">
+          <a className="btn btn-sm" href={NTES(t.title.split(' ')[0])} target="_blank" rel="noreferrer">⏱️ Live running status (NTES) · train {t.title.split(' ')[0]}</a>
+          <a className="btn btn-sm" href={IRCTC} target="_blank" rel="noreferrer">🚆 Book on IRCTC</a>
+        </div>
+      )}
+      {t.auto && t.kind === 'hotel' && trip && (
+        <a className="btn btn-sm" href={bookingCom(trip, t.title)} target="_blank" rel="noreferrer">🏨 Check on Booking.com (your dates)</a>
+      )}
       {onDelete && <button className="btn btn-sm" onClick={onDelete}>Delete ticket</button>}
     </div>
   )

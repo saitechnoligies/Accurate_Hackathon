@@ -1,6 +1,14 @@
 import { useState } from 'react'
 import type { Day, Item, Trip } from '../types'
+import { stepLinks } from '../handoffs'
 import { fmtDate, itemIcon, minsLabel, rupee, STATUS_LABEL } from '../util'
+import { PlacePhoto } from './live'
+
+function Links({ it }: { it: Item }) {
+  const links = stepLinks(it)
+  if (!links.length) return null
+  return <span className="step-links">{links.map((l) => <a key={l.label} href={l.url} target="_blank" rel="noreferrer" className="link small">{l.label} ↗</a>)}</span>
+}
 
 type Props = {
   trip: Trip
@@ -109,6 +117,7 @@ function Row({ it, trip, busy, onSwap, onFeedback, onRideLog, isNow }: {
             {local && !logging && (
               <button className="link small" onClick={() => { setActual(dur); setLogging(true) }}>log actual time</button>
             )}
+            <Links it={it} />
           </div>
           {it.notes.length > 0 && <div className="tl-notes small">{it.notes.join(' · ')}</div>}
           {logging && (
@@ -142,6 +151,8 @@ function Row({ it, trip, busy, onSwap, onFeedback, onRideLog, isNow }: {
           {!!it.cost && <span className="tl-cost">{rupee(it.cost)}</span>}
         </div>
         {it.subtitle && <div className="muted small">{it.subtitle}</div>}
+        {it.type === 'train' && <div className="small"><Links it={it} /></div>}
+        {it.type === 'visit' && <PlacePhoto id={it.attraction_id} alt={it.title} className="pphoto-row" />}
         {it.blurb && <div className="small">{it.blurb} <span className="muted">· open {it.open}–{it.close}{it.indoor ? ' · indoor' : ''}</span></div>}
         {it.notes.length > 0 && (
           <ul className="tl-notes small">
