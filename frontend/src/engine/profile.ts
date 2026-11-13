@@ -4,6 +4,7 @@ import { HOMES, type Catalog } from './data'
 export type ProfileOverrides = Partial<{
   travelers: number; budget: number; days: number; interests: string[]; pace: string; stay_id: string
   train_class: string; outbound: string; return: string; start_date: string; home_label: string
+  diet: string; mobility: string; avoid_heat: boolean; day_start: string; day_end: string
 }>
 
 function isoDate(d: Date): string {
@@ -35,13 +36,18 @@ export function makeProfile(catalog: Catalog, personaId: string, overrides: Prof
     day_end: persona.day_end,
     home: { ...HOMES[personaId] },
     start_date: isoDate(start),
+    diet: 'any',
+    mobility: 'normal',
+    avoid_heat: false,
   }
   const keys = ['travelers', 'budget', 'days', 'interests', 'pace', 'stay_id', 'train_class', 'outbound', 'return',
-    'start_date'] as const
+    'start_date', 'diet', 'mobility', 'avoid_heat', 'day_start', 'day_end'] as const
   for (const k of keys) if (o[k] !== undefined) (profile as Record<string, unknown>)[k] = o[k]
   if (o.home_label) profile.home.label = o.home_label
   profile.days = Math.max(2, Math.min(3, Math.trunc(Number(profile.days))))
   profile.travelers = Math.max(1, Math.min(8, Math.trunc(Number(profile.travelers))))
   profile.budget = Math.max(1000, Math.trunc(Number(profile.budget)))
+  if (!(profile.pace in { relaxed: 1, balanced: 1, packed: 1 })) profile.pace = persona.pace
+  if (profile.mobility === 'limited' && !profile.modes.includes('cab')) profile.modes.push('cab')
   return profile
 }

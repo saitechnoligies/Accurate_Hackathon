@@ -16,7 +16,7 @@ const RECEIPT_LABELS: [string, string][] = [
 ]
 
 /** User edits (skips, swaps) are part of the baseline; live disruptions are not. */
-const liveOnly = (d: NormDisruptions) => ({ skipped: d.skipped, swaps: d.swaps, swap_days: d.swap_days })
+const liveOnly = (d: NormDisruptions) => ({ skipped: d.skipped, swaps: d.swaps, swap_days: d.swap_days, pins: d.pins })
 
 const hasLive = (d: NormDisruptions) =>
   Boolean(d.train_delay_min || d.return_delay_min || d.weather !== 'clear' || d.crowd.length

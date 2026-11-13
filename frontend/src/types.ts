@@ -67,6 +67,7 @@ export type Disruptions = {
   skipped: string[]
   swaps: Record<string, string>
   swap_days?: Record<string, number>
+  pins?: string[]
 }
 
 export type Change = {
@@ -98,7 +99,138 @@ export type Profile = {
   day_end: string
   home: { label: string; lat: number; lng: number; to_station_km: number }
   start_date: string
+  diet?: Diet
+  mobility?: Mobility
+  avoid_heat?: boolean
 }
+
+export type Diet = 'any' | 'veg' | 'jain'
+export type Mobility = 'normal' | 'limited'
+
+export type Prefs = {
+  interests: string[]
+  pace: 'relaxed' | 'balanced' | 'packed'
+  diet: Diet
+  mobility: Mobility
+  avoid_heat: boolean
+  day_start: string
+  day_end: string
+  budget?: number
+  travelers?: number
+}
+
+export type User = { id: string; name: string; emoji: string; color: string; prefs: Prefs }
+
+export type Role = 'owner' | 'editor' | 'viewer'
+export type Member = { user_id: string; role: Role; joined_at: string }
+
+export type TripSummary = {
+  trip_id: string
+  title: string
+  persona_label: string
+  start_date: string
+  days: number
+  travelers: number
+  owner_id: string
+  members: Member[]
+  mode_on: boolean
+  budget: number
+  updated_at: string
+}
+
+export type PollOption = { id: string; label: string }
+export type Poll = {
+  question: string
+  options: PollOption[]
+  votes: Record<string, string>
+  action?: { type: 'swap'; attraction_id: string; alt_id: string; alt_name: string }
+  closed?: boolean
+  result?: string
+}
+
+export type Message = {
+  id: string
+  trip_id: string
+  user_id: string // a user id, 'agent' or 'system'
+  kind: 'text' | 'system' | 'poll' | 'agent'
+  text: string
+  at: string
+  poll?: Poll
+  cards?: AgentCard[]
+}
+
+export type Ticket = {
+  id: string
+  trip_id: string
+  kind: 'train' | 'hotel' | 'entry' | 'custom'
+  title: string
+  subtitle?: string
+  code?: string
+  status?: string
+  day?: number
+  item_id?: string
+  time?: string
+  auto?: boolean
+  file?: string // data URL (frontend-only) or API URL (full stack)
+  file_name?: string
+  added_by?: string
+  at?: string
+}
+
+export type Memory = {
+  id: string
+  trip_id: string
+  user_id: string
+  day: number
+  stop: string
+  item_id?: string
+  caption: string
+  photo?: string
+  at: string
+}
+
+export type JournalEntry = {
+  trip_id: string
+  day: number
+  user_id: string
+  text: string
+  mood: string
+  shared: boolean
+  updated_at: string
+}
+
+export type PlaceCardItem = {
+  id: string; name: string; blurb: string; fee: number; open: string; close: string; tags: string[]
+  indoor: boolean; flagship: boolean; stairs?: boolean; in_trip?: boolean
+}
+export type AgentCard =
+  | { type: 'places'; title: string; items: PlaceCardItem[] }
+  | { type: 'options'; title: string; from: string; to: string;
+      options: { mode: string; label: string; minutes: number; cost: number; note?: string; best?: boolean }[] }
+  | { type: 'plan'; title: string; summary: string[]; total: number; budget: number;
+      days: { day: number; date: string; stops: { time: string; name: string; kind: string }[]; leave?: string; home?: string }[];
+      create?: AgentCreate }
+  | { type: 'day'; title: string; stops: { time: string; name: string; kind: string; status?: string }[] }
+  | { type: 'budget'; title: string; lines: { label: string; amount: number }[]; total: number; budget: number }
+  | { type: 'banner'; title: string; lines: string[] }
+
+export type AgentCreate = {
+  persona_id: string; travelers?: number; days?: number; budget?: number; interests?: string[]; pace?: string
+  diet?: Diet; mobility?: Mobility; avoid_heat?: boolean
+}
+
+export type AgentState = { slots: Partial<AgentCreate>; asked?: string[] }
+
+export type AgentReply = {
+  reply: string
+  cards: AgentCard[]
+  suggestions: string[]
+  state: AgentState
+  trip?: Trip
+  created_trip_id?: string
+}
+
+export type TripEvent = { type: 'trip' | 'messages' | 'tickets' | 'memories' | 'journal' | 'trips'; trip_id?: string }
 
 export type Receipt = {
   lines: { key: string; label: string; amount: number }[]
@@ -125,6 +257,11 @@ export type Naive = {
 
 export type Trip = {
   trip_id: string
+  title?: string
+  owner_id?: string
+  members?: Member[]
+  mode_on?: boolean
+  invite_code?: string
   profile: Profile
   feedback: Record<string, 'kept' | 'skipped'>
   message: string | null

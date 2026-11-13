@@ -34,36 +34,40 @@ export type AttractionData = {
   id: string; name: string; lat: number; lng: number; zone: string; open: string; close: string
   duration: number; fee: number; tags: string[]; indoor: boolean; flagship: boolean
   crowd_peak: [string, string]; kind: 'visit' | 'meal'; blurb: string
+  stairs?: boolean // many steps / steep ramps: avoided for limited mobility
+  veg?: boolean // meals: serves vegetarian
+  jain?: boolean // meals: Jain options (no onion/garlic)
 }
 
 const A = (
   id: string, name: string, lat: number, lng: number, zone: string, open: string, close: string, duration: number,
   fee: number, tags: string[], indoor: boolean, flagship: boolean, crowd_peak: [string, string], kind: 'visit' | 'meal',
-  blurb: string,
-): AttractionData => ({ id, name, lat, lng, zone, open, close, duration, fee, tags, indoor, flagship, crowd_peak, kind, blurb })
+  blurb: string, extra: Partial<AttractionData> = {},
+): AttractionData => ({ id, name, lat, lng, zone, open, close, duration, fee, tags, indoor, flagship, crowd_peak, kind, blurb, ...extra })
 
 // kind: visit | meal. indoor: true if shaded/indoor (heat & rain safe)
 export const ATTRACTIONS: AttractionData[] = [
-  A('amber_fort', 'Amber Fort', 26.9855, 75.8513, 'amber_hill', '08:00', '17:30', 120, 100, ['history', 'photography', 'culture'], false, true, ['10:00', '13:00'], 'visit', 'Hilltop Rajput fort with the Sheesh Mahal mirror palace.'),
+  A('amber_fort', 'Amber Fort', 26.9855, 75.8513, 'amber_hill', '08:00', '17:30', 120, 100, ['history', 'photography', 'culture'], false, true, ['10:00', '13:00'], 'visit', 'Hilltop Rajput fort with the Sheesh Mahal mirror palace.', { stairs: true }),
   A('city_palace', 'City Palace', 26.9258, 75.8237, 'old_city', '09:30', '17:00', 90, 200, ['history', 'culture'], true, true, ['11:00', '14:00'], 'visit', 'Royal residence with museums and the Pritam Niwas courtyard.'),
-  A('hawa_mahal', 'Hawa Mahal', 26.9239, 75.8267, 'old_city', '09:00', '17:00', 45, 50, ['history', 'photography'], false, true, ['10:00', '12:00'], 'visit', 'The 953-window Palace of Winds.'),
+  A('hawa_mahal', 'Hawa Mahal', 26.9239, 75.8267, 'old_city', '09:00', '17:00', 45, 50, ['history', 'photography'], false, true, ['10:00', '12:00'], 'visit', 'The 953-window Palace of Winds.', { stairs: true }),
   A('jantar_mantar', 'Jantar Mantar', 26.9248, 75.8246, 'old_city', '09:00', '16:30', 60, 50, ['history', 'science'], false, false, ['11:00', '13:00'], 'visit', 'UNESCO astronomical observatory with a giant sundial.'),
-  A('nahargarh_fort', 'Nahargarh Fort', 26.9373, 75.8155, 'nahargarh_hill', '10:00', '18:30', 90, 50, ['history', 'photography', 'nature'], false, false, ['16:30', '18:00'], 'visit', 'Ridge-top fort with the best sunset view over the city.'),
-  A('jaigarh_fort', 'Jaigarh Fort', 26.9851, 75.8456, 'amber_hill', '09:00', '16:30', 75, 100, ['history'], false, false, ['11:00', '13:00'], 'visit', "Home of Jaivana, once the world's largest cannon on wheels."),
+  A('nahargarh_fort', 'Nahargarh Fort', 26.9373, 75.8155, 'nahargarh_hill', '10:00', '18:30', 90, 50, ['history', 'photography', 'nature'], false, false, ['16:30', '18:00'], 'visit', 'Ridge-top fort with the best sunset view over the city.', { stairs: true }),
+  A('jaigarh_fort', 'Jaigarh Fort', 26.9851, 75.8456, 'amber_hill', '09:00', '16:30', 75, 100, ['history'], false, false, ['11:00', '13:00'], 'visit', "Home of Jaivana, once the world's largest cannon on wheels.", { stairs: true }),
   A('albert_hall', 'Albert Hall Museum', 26.9116, 75.8195, 'central', '09:00', '22:00', 75, 40, ['history', 'culture', 'science'], true, false, ['12:00', '15:00'], 'visit', 'Indo-Saracenic museum, lit up beautifully at night.'),
   A('jal_mahal', 'Jal Mahal Viewpoint', 26.9535, 75.8462, 'amber_hill', '06:00', '21:00', 30, 0, ['photography', 'nature'], false, true, ['17:30', '19:00'], 'visit', 'Water palace floating on Man Sagar lake.'),
   A('bapu_bazaar', 'Bapu Bazaar', 26.9161, 75.8193, 'old_city', '10:30', '21:00', 60, 0, ['shopping', 'culture'], false, false, ['18:00', '20:00'], 'visit', 'Textiles, mojaris and block prints.'),
   A('patrika_gate', 'Patrika Gate', 26.8417, 75.8008, 'south', '08:00', '20:00', 40, 0, ['photography', 'culture'], false, false, ['17:00', '19:00'], 'visit', "Hand-painted gateway, a photographer's favourite."),
   A('birla_mandir', 'Birla Mandir', 26.8921, 75.8155, 'central', '08:00', '20:00', 40, 0, ['spiritual', 'culture'], true, false, ['18:00', '19:30'], 'visit', 'White marble temple at the foot of Moti Dungri.'),
-  A('galtaji', 'Galtaji (Monkey Temple)', 26.9172, 75.8578, 'east', '06:00', '20:00', 60, 0, ['spiritual', 'nature', 'photography'], false, false, ['17:00', '18:30'], 'visit', 'Temple complex with natural springs in a mountain pass.'),
+  A('galtaji', 'Galtaji (Monkey Temple)', 26.9172, 75.8578, 'east', '06:00', '20:00', 60, 0, ['spiritual', 'nature', 'photography'], false, false, ['17:00', '18:30'], 'visit', 'Temple complex with natural springs in a mountain pass.', { stairs: true }),
   A('sisodia_garden', 'Sisodia Rani Garden', 26.8915, 75.8811, 'east', '08:00', '18:00', 45, 30, ['nature', 'photography'], false, false, ['16:00', '17:30'], 'visit', 'Terraced Mughal-style garden with murals.'),
   A('jkk', 'Jawahar Kala Kendra', 26.8992, 75.8095, 'central', '10:00', '20:00', 60, 0, ['culture', 'art'], true, false, ['17:00', '19:00'], 'visit', 'Arts centre designed by Charles Correa; cool and shaded.'),
   A('chokhi_dhani', 'Chokhi Dhani Village', 26.7684, 75.8350, 'outskirts', '17:30', '23:00', 150, 900, ['culture', 'food'], false, false, ['19:30', '21:00'], 'visit', 'Rajasthani village experience with folk dance and thali dinner.'),
   // meals / chai stops
-  A('lmb', 'Laxmi Misthan Bhandar (LMB)', 26.9230, 75.8270, 'old_city', '08:00', '23:00', 50, 350, ['food'], true, false, ['13:00', '14:00'], 'meal', 'Classic Rajasthani thali and ghewar since 1727.'),
-  A('rawat', 'Rawat Mishthan Bhandar', 26.9205, 75.7905, 'station', '06:00', '22:00', 35, 120, ['food'], true, false, ['17:00', '19:00'], 'meal', 'Famous pyaaz kachori, a short walk from the station.'),
-  A('tapri', 'Tapri Central (chai)', 26.9056, 75.8086, 'central', '08:00', '23:00', 40, 250, ['food'], true, false, ['17:00', '20:00'], 'meal', 'Rooftop chai and snacks overlooking Central Park.'),
-  A('amber_cafe', 'Amber Hills Dhaba', 26.9830, 75.8520, 'amber_hill', '09:00', '18:00', 40, 220, ['food'], true, false, ['13:00', '14:00'], 'meal', 'Dal-baati-churma at the foot of Amber Fort.'),
+  A('lmb', 'Laxmi Misthan Bhandar (LMB)', 26.9230, 75.8270, 'old_city', '08:00', '23:00', 50, 350, ['food'], true, false, ['13:00', '14:00'], 'meal', 'Classic Rajasthani thali and ghewar since 1727.', { veg: true, jain: true }),
+  A('rawat', 'Rawat Mishthan Bhandar', 26.9205, 75.7905, 'station', '06:00', '22:00', 35, 120, ['food'], true, false, ['17:00', '19:00'], 'meal', 'Famous pyaaz kachori, a short walk from the station.', { veg: true, jain: false }),
+  A('tapri', 'Tapri Central (chai)', 26.9056, 75.8086, 'central', '08:00', '23:00', 40, 250, ['food'], true, false, ['17:00', '20:00'], 'meal', 'Rooftop chai and snacks overlooking Central Park.', { veg: true, jain: true }),
+  A('amber_cafe', 'Amber Hills Dhaba', 26.9830, 75.8520, 'amber_hill', '09:00', '18:00', 40, 220, ['food'], true, false, ['13:00', '14:00'], 'meal', 'Dal-baati-churma at the foot of Amber Fort.', { veg: true, jain: false }),
+  A('handi', 'Handi Restaurant', 26.9157, 75.8105, 'central', '12:00', '23:00', 50, 450, ['food'], true, false, ['13:00', '14:30'], 'meal', 'Laal maas and Mughlai curries; non-veg favourite on MI Road.', { veg: false, jain: false }),
 ]
 
 export const STAYS = [

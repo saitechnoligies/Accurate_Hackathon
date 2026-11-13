@@ -46,8 +46,11 @@ export function normalizeDisruptions(d?: Partial<Disruptions> | null): NormDisru
     skipped: [...(x.skipped ?? [])], // attractions the traveller skipped
     swaps: { ...(x.swaps ?? {}) }, // original id -> plan B id
     swap_days: swapDays, // plan B id -> day it replaces
+    pins: [...(x.pins ?? [])], // stops the traveller asked to add
   }
 }
+
+const LIMITED_WALK_KM = 0.5
 
 const overlaps = (a0: number, a1: number, b0: number, b1: number) => a0 < b1 && b0 < a1
 
@@ -91,6 +94,7 @@ export class Planner {
   used_cloakroom = false
   cur_day = 1
   fixed_estimate = 0
+  limited = false
 
   constructor(catalog: Catalog, profile: Profile, disruptions?: Partial<Disruptions> | null) {
     this.cat = catalog
@@ -105,7 +109,8 @@ export class Planner {
     this.pace = PACE[profile.pace]
     this.trav = Math.trunc(profile.travelers)
     this.excluded = new Set([...this.d.skipped, ...Object.keys(this.d.swaps)])
-    this.pinned = new Set(Object.values(this.d.swaps))
+    this.pinned = new Set([...Object.values(this.d.swaps), ...this.d.pins])
+    this.limited = profile.mobility === 'limited'
     this.ledger = Object.fromEntries(
       ['train', 'stay', 'home_transfers', 'local_rides', 'tickets', 'meals', 'extras'].map((k) => [k, 0]))
     this.hotel = { name: this.stay.name, lat: this.stay.lat, lng: this.stay.lng, zone: this.stay.zone }
@@ -125,7 +130,8 @@ export class Planner {
   modesAt(t: number): string[] {
     let modes = this.p.modes.filter((m) => m !== 'walk')
     const wx = this.d.weather
-    if ((wx === 'heat' || wx === 'rain') && modes.includes('cab') && (wx === 'rain' || (HEAT[0] <= t && t <= HEAT[1])))
+    if (modes.includes('cab') && (this.limited
+      || ((wx === 'heat' || wx === 'rain') && (wx === 'rain' || (HEAT[0] <= t && t <= HEAT[1])))))
       modes = ['cab', ...modes.filter((m) => m !== 'cab')]
     return modes
   }
@@ -135,7 +141,7 @@ export class Planner {
     if (this.p.modes.includes('walk') && !(this.d.weather === 'heat' && HEAT[0] <= t && t <= HEAT[1])
       && this.d.weather !== 'rain') {
       const w = travel(a, b, 'walk', this.trav, this.corr)
-      if (w) return [w]
+      if (w && !(this.limited && w.km > LIMITED_WALK_KM)) return [w]
     }
     for (const m of this.modesAt(t)) {
       const leg = travel(a, b, m, this.trav, this.corr)
@@ -215,7 +221,7 @@ export class Planner {
   weatherOk(a: AttractionData, start: number, end: number): boolean {
     if (a.indoor) return true
     if (this.d.weather === 'rain') return false
-    if (this.d.weather === 'heat' && overlaps(start, end, ...HEAT)) return false
+    if ((this.d.weather === 'heat' || this.p.avoid_heat) && overlaps(start, end, ...HEAT)) return false
     return true
   }
 
@@ -267,7 +273,19 @@ export class Planner {
   pool(): AttractionData[] {
     const days = this.d.swap_days
     return this.cat.attractions.filter((a) => a.kind === 'visit' && !this.visited.has(a.id) && !this.excluded.has(a.id)
-      && (days[a.id] ?? this.cur_day) === this.cur_day)
+      && (days[a.id] ?? this.cur_day) === this.cur_day && this.accessible(a))
+  }
+
+  /** Limited mobility skips stair-heavy places unless the traveller pinned them. */
+  accessible(a: AttractionData): boolean {
+    return !(this.limited && a.stairs && !this.pinned.has(a.id))
+  }
+
+  dietOk(a: AttractionData): boolean {
+    const diet = this.p.diet ?? 'any'
+    if (diet === 'jain') return Boolean(a.jain)
+    if (diet === 'veg') return a.veg !== false
+    return true
   }
 
   addStop(day: number, items: Rec[], c: Cand, loc: Loc): [number, Loc] {
@@ -305,7 +323,7 @@ export class Planner {
       if (!hadLunch && t >= LUNCH[0] - 30) {
         hadLunch = true
         if (t <= LUNCH[1]) {
-          const meals = this.cat.attractions.filter((a) => a.kind === 'meal')
+          const meals = this.cat.attractions.filter((a) => a.kind === 'meal' && this.dietOk(a))
             .map((a) => this.evaluate(a, t, loc, deadline))
             .filter((m): m is Cand => !!m && m.start <= LUNCH[1])
           if (meals.length) {
@@ -537,7 +555,8 @@ export class Planner {
         const orig = this.attr[it.attraction_id]
         let best: [Cand, number, number] | null = null
         for (const alt of this.cat.attractions) {
-          if (alt.kind !== 'visit' || inTrip.has(alt.id) || this.excluded.has(alt.id) || usedBackups.has(alt.id)) continue
+          if (alt.kind !== 'visit' || inTrip.has(alt.id) || this.excluded.has(alt.id) || usedBackups.has(alt.id)
+            || !this.accessible(alt)) continue
           const c = this.evaluate(alt, depart, prevPlace, () => 10_000, 20)
           if (!c) continue
           const back = this.legs(this.placeOf(alt), nextPlace, c.end)[0]
