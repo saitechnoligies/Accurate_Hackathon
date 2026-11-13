@@ -3,6 +3,9 @@ import { api } from '../api'
 import { autoTickets, hhmm, nowNext } from '../features'
 import type { Item, Trip, User } from '../types'
 import { itemIcon, minsLabel, rupee } from '../util'
+import { stepLinks } from '../handoffs'
+import { addReminder, removeReminder, useReminders } from '../voice'
+import { PlacePhoto } from './live'
 import { AddMemory } from './Memories'
 
 type Props = {
@@ -31,6 +34,7 @@ export default function TripMode({ trip, user, busy, notify, onClose, onEnd, run
   const [now, setNow] = useState(d.items[0]?.start_min ?? 480)
   const [memory, setMemory] = useState(false)
   const [geo, setGeo] = useState<string | null>(null)
+  const reminders = useReminders(() => {})
 
   useEffect(() => { setNow(d.items[0]?.start_min ?? 480) }, [day]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -102,6 +106,7 @@ export default function TripMode({ trip, user, busy, notify, onClose, onEnd, run
           <span className="tm-label">{cur && focus === cur ? 'Right now' : 'Up next'}</span>
           {focus ? (
             <>
+              {focus.type === 'visit' && <PlacePhoto id={focus.attraction_id} alt={focus.title} className="pphoto-tm" />}
               <h2>{itemIcon(focus)} {focus.title}</h2>
               <p className="tm-sub">{focus.start}{focus.end !== focus.start ? `–${focus.end}` : ''}{focus.subtitle ? ` · ${focus.subtitle}` : ''}</p>
               {focus.notes[0] && <p className="tm-note">{focus.notes[0]}</p>}
@@ -111,6 +116,7 @@ export default function TripMode({ trip, user, busy, notify, onClose, onEnd, run
             <div className="tm-leave">
               <span>Leave in</span><b>{minsLabel(Math.max(0, nextRide.start_min - now))}</b>
               <span className="small">{itemIcon(nextRide)} {nextRide.title}{nextRide.cost ? ` · ${rupee(nextRide.cost)}` : ''}</span>
+              {stepLinks(nextRide).map((l) => <a key={l.label} className="btn btn-sm tm-btn" href={l.url} target="_blank" rel="noreferrer">{l.label === 'Directions' ? '🧭 Navigate' : l.label} ↗</a>)}
             </div>
           )}
         </section>
@@ -138,6 +144,23 @@ export default function TripMode({ trip, user, busy, notify, onClose, onEnd, run
           <button className="btn tm-big" onClick={onGroup}>💬 Group chat</button>
         </div>
         {geo && <p className="tm-geo">{geo}</p>}
+
+        <section className="tm-rem">
+          <div className="row-gap">
+            <span className="tm-label">Reminders</span>
+            <button className="btn btn-sm tm-btn" onClick={() => {
+              addReminder({ label: nextRide ? `leave for ${nextRide.title.replace(/^.*? to /, '')}` : 'check the next stop', due: Date.now() + 10 * 60_000 })
+              notify('Reminder set for 10 minutes from now')
+            }}>⏰ Remind me in 10 min</button>
+            <span className="small">or say “remind me to … in 5 minutes” to the assistant</span>
+          </div>
+          {reminders.length > 0 && (
+            <ul>{reminders.map((r) => (
+              <li key={r.id}>{r.label} · {new Date(r.due).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                <button className="link small" onClick={() => removeReminder(r.id)}>cancel</button></li>
+            ))}</ul>
+          )}
+        </section>
 
         <ol className="tm-strip">
           {d.items.filter((i) => i.type !== 'transfer' && i.type !== 'buffer').map((i) => (

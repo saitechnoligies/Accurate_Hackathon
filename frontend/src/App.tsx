@@ -19,21 +19,32 @@ import TripMap from './components/TripMap'
 import TripMode from './components/TripMode'
 import { Avatar, Avatars } from './components/ui'
 import Wallet from './components/Wallet'
-import type { Disruptions, Item, Meta, Trip, TripSummary, User } from './types'
+import Expenses from './components/Expenses'
+import Guide from './components/Guide'
+import Packing from './components/Packing'
+import Proactive from './components/Proactive'
+import type { Suggestion } from './proactive'
+import { useLive } from './useLive'
+import { useTripData } from './useTripData'
+import { useReminders } from './voice'
+import type { Disruptions, Expense, Item, Meta, Trip, TripSummary, User } from './types'
 import { storage } from './util'
 
 const TRIP_KEY = 'delayproof.trip'
 const USER_KEY = 'delayproof.user'
 
-type Tab = 'plan' | 'assistant' | 'group' | 'wallet' | 'memories' | 'journal' | 'calendar'
+type Tab = 'plan' | 'assistant' | 'group' | 'wallet' | 'expenses' | 'packing' | 'memories' | 'journal' | 'calendar' | 'guide'
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'plan', label: 'Plan', icon: '🗺️' },
   { id: 'assistant', label: 'Assistant', icon: '🤖' },
   { id: 'group', label: 'Group', icon: '💬' },
   { id: 'wallet', label: 'Wallet', icon: '🎫' },
+  { id: 'expenses', label: 'Expenses', icon: '💸' },
+  { id: 'packing', label: 'Packing', icon: '🧳' },
   { id: 'memories', label: 'Memories', icon: '📸' },
   { id: 'journal', label: 'Journal', icon: '📓' },
   { id: 'calendar', label: 'Calendar', icon: '📅' },
+  { id: 'guide', label: 'Guide', icon: '🧭' },
 ]
 
 /** Per-tab identity so two windows can be two different friends. */
@@ -65,6 +76,9 @@ export default function App() {
   const [bootError, setBootError] = useState<string | null>(null)
 
   const user = useMemo(() => users.find((u) => u.id === uid) ?? null, [users, uid])
+  const live = useLive(trip)
+  const [expenses, setExpenses] = useTripData<Expense>(trip?.trip_id, 'expenses', api.expenses)
+  useReminders((label) => setToast({ text: `⏰ Reminder: ${label}`, kind: 'info' }))
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
 
   const loadUsers = useCallback(() => api.users().then(setUsers), [])
@@ -173,6 +187,17 @@ export default function App() {
     setDrawer(false)
     loadTrips()
   }
+  /** A proactive suggestion was accepted: apply it through the planner. */
+  const accept = (s: Suggestion) => {
+    if (!trip || !s.action) return
+    const a = s.action.do
+    if (a.type === 'disrupt') run(() => api.disrupt(trip.trip_id, a.patch, uid!))
+    else if (a.type === 'skip') run(() => api.feedback(trip.trip_id, a.attraction_id, 'skipped', uid!))
+    else if (a.type === 'swap') run(() => api.swap(trip.trip_id, a.attraction_id, uid!))
+    else if (a.type === 'packing') api.addPacking(trip.trip_id, uid!, a.items.map((text) => ({ text, category: 'Health', why: s.title })))
+      .then(() => { setToast({ text: 'Added to the packing list', kind: 'info' }); setTab('packing') })
+    else if (a.type === 'tab') setTab(a.tab as Tab)
+  }
   const setMode = (on: boolean) => {
     if (!trip) return
     setModeHidden(false)
@@ -253,6 +278,7 @@ export default function App() {
             {tab === 'plan' && (
               <div className="trip-grid">
                 <div className="col-main">
+                  <Proactive trip={trip} live={live} expenses={expenses} onAccept={accept} />
                   <ReplanBanner trip={trip} />
                   <DisruptionPanel trip={trip} busy={busy} onChange={disrupt} onReset={reset} />
                   <Timeline trip={trip} day={day} onDay={setDay} busy={busy} onSwap={swap} onFeedback={feedback} onRideLog={rideLog} />
@@ -270,6 +296,9 @@ export default function App() {
               <GroupChat trip={trip} user={user} users={userMap} allUsers={users} notify={notify} onTrip={(t) => setTrip(t)} />
             )}
             {tab === 'wallet' && <Wallet trip={trip} user={user} users={userMap} notify={notify} />}
+            {tab === 'expenses' && <Expenses trip={trip} user={user} users={userMap} expenses={expenses} setExpenses={setExpenses} notify={notify} />}
+            {tab === 'packing' && <Packing trip={trip} user={user} users={userMap} live={live} notify={notify} />}
+            {tab === 'guide' && <Guide trip={trip} live={live} />}
             {tab === 'memories' && <Memories trip={trip} user={user} users={userMap} notify={notify} />}
             {tab === 'journal' && <Journal trip={trip} user={user} users={userMap} notify={notify} />}
             {tab === 'calendar' && <CalendarView trip={trip} trips={trips} onOpen={openTrip} onDay={(d) => { setDay(d); setTab('plan') }} />}

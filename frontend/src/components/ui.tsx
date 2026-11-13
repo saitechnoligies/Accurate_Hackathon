@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import type { AgentCard, User } from '../types'
 import { MODE_ICON, rupee } from '../util'
+import { PlacePhoto } from './live'
 
 export function Avatar({ user, size = 30 }: { user?: User | null; size?: number }) {
   if (!user) return <span className="avatar" style={{ width: size, height: size }}>?</span>
@@ -74,6 +75,7 @@ function AgentCardView({ card, onAction }: { card: AgentCard; onAction?: (text: 
         <div className="place-list">
           {card.items.map((p) => (
             <div key={p.id} className="place">
+              <PlacePhoto id={p.id} alt={p.name} className="pphoto-card" />
               <div className="place-top">
                 <b>{p.name}</b>
                 {p.flagship && <span className="badge badge-flag">Must-see</span>}

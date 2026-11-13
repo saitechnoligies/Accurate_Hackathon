@@ -3,7 +3,8 @@
    Every tab of the same browser shares the data, and changes are pushed to the other tabs with a
    BroadcastChannel, so two windows behave like two friends on a live, shared trip. */
 import type {
-  AgentCreate, AgentReply, AgentState, Disruptions, JournalEntry, LearningState, Member, Memory, Message, Meta, Poll,
+  AgentCreate, AgentReply, AgentState, Disruptions, Expense, JournalEntry, LearningState, Member, Memory, Message, Meta,
+  PackItem, Poll,
   Prefs, Profile, SimResult, Ticket, Trip, TripEvent, TripSummary, User,
 } from '../types'
 import { runAgent, type AgentTools } from './agent'
@@ -37,6 +38,8 @@ type State = {
   tickets: Record<string, StoredTicket[]>
   memories: Record<string, StoredMemory[]>
   journal: Record<string, JournalEntry>
+  packing: Record<string, PackItem[]>
+  expenses: Record<string, Expense[]>
   settings: { ai_brain: 'offline' | 'llm'; llm_key?: string }
   model: { weights: Record<string, number>; tag_affinity: Record<string, Record<string, number>>; updates: number }
   corridors: Record<string, Corridor>
@@ -51,7 +54,7 @@ const freshLearning = (): Pick<State, 'model' | 'corridors' | 'feedback'> => ({
 
 const fresh = (): State => ({
   trips: {}, users: Object.fromEntries(DEMO_USERS.map((u) => [u.id, structuredClone(u)])), messages: {}, tickets: {},
-  memories: {}, journal: {}, settings: { ai_brain: 'offline' }, ...freshLearning(),
+  memories: {}, journal: {}, packing: {}, expenses: {}, settings: { ai_brain: 'offline' }, ...freshLearning(),
 })
 
 let memory: State | null = null
@@ -595,6 +598,64 @@ export const api = {
     s.journal[`${e.trip_id}|${e.day}|${e.user_id}`] = rec
     save({ type: 'journal', trip_id: e.trip_id })
     return rec
+  }),
+
+  // ---------------------------------------------------------------- packing (shared by the group)
+  packing: (id: string) => later(() => clone(load().packing[id] ?? [])),
+  addPacking: (id: string, uid: string, items: Pick<PackItem, 'text' | 'category' | 'why'>[]) => later(() => {
+    const s = load()
+    const list = (s.packing[id] ??= [])
+    const have = new Set(list.map((x) => x.text.toLowerCase()))
+    const fresh = items.filter((x) => x.text.trim() && !have.has(x.text.trim().toLowerCase()))
+    for (const x of fresh) list.push({ id: newId(), trip_id: id, text: x.text.trim(), category: x.category || 'Other', why: x.why, added_by: uid })
+    if (fresh.length > 1) post(id, { user_id: 'system', kind: 'system', text: `🧳 ${userName(uid)} added ${fresh.length} items to the packing list.` })
+    save({ type: 'packing', trip_id: id }, { type: 'messages', trip_id: id })
+    return clone(list)
+  }),
+  updatePacking: (id: string, itemId: string, patch: Partial<Pick<PackItem, 'done_by' | 'assignee'>>) => later(() => {
+    const s = load()
+    const it = (s.packing[id] ?? []).find((x) => x.id === itemId)
+    if (!it) throw new Error('Item not found')
+    for (const [k, v] of Object.entries(patch)) (it as Record<string, unknown>)[k] = v || undefined
+    save({ type: 'packing', trip_id: id })
+    return clone(s.packing[id])
+  }),
+  deletePacking: (id: string, itemId: string) => later(() => {
+    const s = load()
+    s.packing[id] = (s.packing[id] ?? []).filter((x) => x.id !== itemId)
+    save({ type: 'packing', trip_id: id })
+    return clone(s.packing[id])
+  }),
+
+  // ---------------------------------------------------------------- expenses & settle-up
+  expenses: (id: string) => later(() => clone(load().expenses[id] ?? [])),
+  addExpense: (id: string, uid: string, e: Omit<Expense, 'id' | 'trip_id' | 'at'>) => later(() => {
+    const s = load()
+    if (!(e.amount > 0)) throw new Error('Enter an amount above zero')
+    const rec: Expense = { ...e, id: newId(), trip_id: id, at: now() }
+    ;(s.expenses[id] ??= []).push(rec)
+    if (e.category === 'extra') post(id, { user_id: 'system', kind: 'system', text: `💸 ${userName(e.paid_by)} paid ₹${Math.round(e.amount).toLocaleString('en-IN')} for ${e.title} (split ${e.split.length} way${e.split.length > 1 ? 's' : ''})${uid !== e.paid_by ? `, logged by ${userName(uid)}` : ''}.` })
+    save({ type: 'expenses', trip_id: id }, { type: 'messages', trip_id: id })
+    return clone(s.expenses[id])
+  }),
+  addPackageExpenses: (id: string, uid: string) => later(() => {
+    const s = load()
+    const t = getTrip(id)
+    const v = tripView(t)
+    const list = (s.expenses[id] ??= []).filter((x) => x.category !== 'package')
+    const members = t.members.map((m) => m.user_id)
+    for (const l of v.receipt.lines.filter((x) => x.amount > 0))
+      list.push({ id: newId(), trip_id: id, title: l.label, amount: l.amount, paid_by: uid, split: members, day: 1, category: 'package', at: now() })
+    s.expenses[id] = list
+    post(id, { user_id: 'system', kind: 'system', text: `🧾 ${userName(uid)} paid the package (₹${v.receipt.total.toLocaleString('en-IN')}); it is now split across ${members.length} members.` })
+    save({ type: 'expenses', trip_id: id }, { type: 'messages', trip_id: id })
+    return clone(list)
+  }),
+  deleteExpense: (id: string, expenseId: string) => later(() => {
+    const s = load()
+    s.expenses[id] = (s.expenses[id] ?? []).filter((x) => x.id !== expenseId)
+    save({ type: 'expenses', trip_id: id })
+    return clone(s.expenses[id])
   }),
 
   /** Live calendar feed URL (full stack only). */

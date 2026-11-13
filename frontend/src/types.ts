@@ -230,7 +230,33 @@ export type AgentReply = {
   created_trip_id?: string
 }
 
-export type TripEvent = { type: 'trip' | 'messages' | 'tickets' | 'memories' | 'journal' | 'trips'; trip_id?: string }
+export type PackItem = {
+  id: string
+  trip_id: string
+  text: string
+  category: string
+  assignee?: string // user who brings it
+  done_by?: string // user who packed it
+  added_by?: string
+  why?: string // reason when suggested by the plan
+}
+
+export type Expense = {
+  id: string
+  trip_id: string
+  title: string
+  amount: number
+  paid_by: string
+  split: string[] // user ids sharing the cost
+  day: number
+  category: 'package' | 'extra'
+  at: string
+}
+
+export type TripEvent = {
+  type: 'trip' | 'messages' | 'tickets' | 'memories' | 'journal' | 'trips' | 'packing' | 'expenses'
+  trip_id?: string
+}
 
 export type Receipt = {
   lines: { key: string; label: string; amount: number }[]

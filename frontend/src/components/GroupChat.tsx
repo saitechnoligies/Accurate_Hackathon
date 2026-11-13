@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import type { Message, Poll, Trip, User } from '../types'
 import { rupee } from '../util'
+import { MicButton } from './live'
 import { AgentCards, Avatar, Modal, timeAgo } from './ui'
 
 type Props = {
@@ -68,6 +69,7 @@ export default function GroupChat({ trip, user, users, allUsers, notify, onTrip 
         </div>
         <form className="chat-input" onSubmit={send}>
           <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Message the group… (@ai what if it rains?)" aria-label="Message the group" />
+          <MicButton onText={(t) => setText((cur) => (cur ? `${cur} ${t}` : t))} title="Dictate a message" />
           <button className="btn btn-primary" disabled={sending || !text.trim()}>Send</button>
         </form>
       </section>

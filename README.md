@@ -72,6 +72,16 @@ Asset paths are relative, so it also works from a sub-folder or opened through a
 | **Calendar** | 📅 Calendar | Month + day agenda and `.ics` export with alerts. (The live subscription feed needs the server: see `main`.) |
 | **Trip mode** | 🧭 Start trip mode | Now / next / leave-in countdown, the ticket you need, Running late (re-plans), Done, Skip, Plan B, Add memory, Share status, location check. |
 | **Demo identities** | Login | One click as Priya / Rohit / Ananya / Kabir, per browser tab. Two tabs = two friends on the same trip. |
+| **Live forecast & air quality** | 🧭 Guide, Plan tab | Open-Meteo daily forecast for the trip dates and CAMS air quality, keyless, cached with their fetch time. A "simulate heatwave" switch is labelled Simulated. |
+| **Proactive suggestions** | Plan tab (top) | Detectors over the plan + live data: forecast ≥ 40°C or rain on a trip day, AQI > 150, budget ≥ 90% (including logged extras), a must-see at crowd peak, late-night arrival. Accepting one re-plans through the engine (heat/rain plan, drop the priciest optional stop, Plan B swap, add masks to packing). Dismiss or mute a category. |
+| **Freshness labels** | Everywhere live data appears | Every figure is marked Live, Cached or Simulated, with its source and time. |
+| **Place photos** | Timeline, assistant cards, Guide, Trip mode | Wikipedia thumbnails with a link to the source page; places without a licensed photo show none. |
+| **City brief** | 🧭 Guide | Wikivoyage excerpts (Understand, Get in, Get around, Eat, Buy, Stay safe) under CC BY-SA, with our own offline notes as fallback; helplines (112, 108, 1800-11-1363, 139, 1091). |
+| **Booking hand-offs** | Timeline, Wallet, Trip mode, Guide | Directions (Google Maps), Uber / Rapido for the next ride, IRCTC and NTES running status for trains, Booking.com prefilled with the stay, dates and party. No fake inventory. |
+| **Voice** | Assistant, Group chat | Tap the mic to speak (Web Speech API), 🔊 to hear replies, and "remind me to … in N minutes" sets a reminder (toast + voice + notification). Trip mode has one-tap "remind me in 10 min". |
+| **Packing list** | 🧳 Packing | Shared by the group, with assignees and ticks. Suggestions come from the plan and forecast: ID for the train, sunscreen for 33°C+, umbrella for rain, shoes for hill forts, socks for temples, medicines for limited mobility, a day bag when the cloakroom is used. |
+| **Expenses & settle-up** | 💸 Expenses | "I paid the package" splits the receipt across members; log extras with who paid and who shares; balances and the fewest transfers to settle; spending by day vs plan. |
+| **Installable & offline** | Browser "Install app" | Web manifest + service worker cache the app shell and seen map tiles, so the pocket plan opens without a connection (production build). |
 
 `main` has the same screens backed by FastAPI + MongoDB Atlas with WebSocket sync and a live calendar feed. Both branches produce identical plans (126 scenarios checked).
 
