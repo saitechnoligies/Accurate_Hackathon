@@ -186,7 +186,7 @@ export default function JudgeDrawer({ open, onClose, trip, onModelChanged }: Pro
           </table>
           {state && (
             <p className="muted small">
-              Feedback stored: {state.feedback.real} real · {state.feedback.synthetic} synthetic · DB: {state.db === 'atlas' ? 'MongoDB Atlas' : 'in-memory'}
+              Feedback stored: {state.feedback.real} real · {state.feedback.synthetic} synthetic · Storage: {state.db === 'browser' ? 'this browser (localStorage)' : state.db}
             </p>
           )}
         </section>

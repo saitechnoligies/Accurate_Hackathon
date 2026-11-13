@@ -73,9 +73,9 @@ export default function App() {
   if (bootError) {
     return (
       <div className="boot">
-        <h2>Can’t reach the DelayProof API</h2>
+        <h2>Couldn’t start the DelayProof engine</h2>
         <p className="muted">{bootError}</p>
-        <p className="muted small">Start the backend: <code>cd backend && .venv\Scripts\python -m uvicorn app.main:app --port 8000</code></p>
+        <p className="muted small">Try reloading the page.</p>
       </div>
     )
   }

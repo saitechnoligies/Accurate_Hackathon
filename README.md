@@ -13,33 +13,19 @@ When a train runs late, the heat spikes or a crowd surges, the plan repairs itse
 
 | Layer | Tech |
 |---|---|
-| Frontend | React 19 + TypeScript (Vite), Leaflet / react-leaflet |
-| Backend | Python 3.13, FastAPI, Motor (async MongoDB) |
-| Database | MongoDB Atlas (falls back to in-memory automatically if Atlas is unreachable) |
+| App | React 19 + TypeScript (Vite), Leaflet / react-leaflet |
+| Engine | TypeScript, runs in the browser (`frontend/src/engine/`) |
+| Storage | Browser `localStorage` (trips, learned weights, corridor buffers) |
+
+**This is the `frontend-only` branch: no backend server and no database are needed.** The planner, re-plan and
+learning engine that lived in the Python/FastAPI backend on `main` has been ported line for line to TypeScript
+and gives identical plans for every persona and disruption (checked on 36 scenarios). The `backend/` folder is
+kept only for reference.
 
 ## Run it
 
-Prerequisites: Python 3.11+, Node 20+. Commands below are for Windows PowerShell; run each line separately
+Prerequisites: Node 20+. Commands below are for Windows PowerShell; run each line separately
 (PowerShell 5.1 does not support `&&`; use `;` to chain).
-
-**1. Backend** (port 8000)
-
-```bash
-cd backend
-python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-copy .env.example .env
-```
-
-Edit `backend/.env` and set `MONGO_URI` (Atlas connection string). Set `USE_MEMORY_DB=1` to run fully offline.
-
-```bash
-.venv\Scripts\python -m uvicorn app.main:app --port 8000
-```
-
-On startup the API seeds the Jaipur catalog (attractions, stays, trains, personas) and the initial model weights.
-
-**2. Frontend** (port 5173, proxies `/api` to the backend)
 
 ```bash
 cd frontend
@@ -48,6 +34,9 @@ npm run dev
 ```
 
 Open http://localhost:5173.
+
+To deploy, run `npm run build` and upload `frontend/dist/` to any static host (Netlify, Vercel, GitHub Pages).
+Asset paths are relative, so it also works from a sub-folder or opened through a local static server.
 
 ## Features → problem-statement pillars
 
@@ -73,13 +62,13 @@ Open http://localhost:5173.
 ## How the engine works
 
 ```
-backend/app/
-  data/jaipur.py         mock catalog: 19 places, 3 stays, 4 trains, ride modes, corridor buffers, personas
-  engine/geo.py          travel model: haversine × road factor, hill ×1.35, Old City ×1.2, + learned buffer
-  engine/scheduler.py    door-to-door planner (anchors + greedy scoring + Plan B)
-  engine/replan.py       baseline vs re-plan diff, static-plan comparison, explanation banner, receipt
-  engine/learning.py     online weight updates, corridor EMA, synthetic seeder + holdout evaluation
-  main.py                FastAPI routes
+frontend/src/engine/
+  data.ts           mock catalog: 19 places, 3 stays, 4 trains, ride modes, corridor buffers, personas
+  geo.ts            travel model: haversine × road factor, hill ×1.35, Old City ×1.2, + learned buffer
+  scheduler.ts      door-to-door planner (anchors + greedy scoring + Plan B)
+  replan.ts         baseline vs re-plan diff, static-plan comparison, explanation banner, receipt
+  learning.ts       online weight updates, corridor EMA, synthetic seeder + holdout evaluation
+  store.ts          the "API": trips, swaps, feedback, ride logs, learning state, saved in localStorage
 ```
 
 1. **Anchors never move**: trains, hotel check-in/checkout, closing times and the return-train deadline.
@@ -94,22 +83,24 @@ backend/app/
 
 The engine is deterministic and rule-based, so it never breaks during a demo, and every decision can be explained in plain English.
 
-## API
+## Engine operations (`frontend/src/engine/store.ts`)
 
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/api/health` | Status and DB mode (atlas / memory) |
-| GET | `/api/meta` | Personas, stays, trains, attractions, modes |
-| POST | `/api/trips` | Create a trip from a persona (+ travellers, days, budget) |
-| GET | `/api/trips/{id}` | Current plan, baseline, receipt, banner, diff |
-| POST | `/api/trips/{id}/disruptions` | Apply train delay / weather / crowd / late start / return delay |
-| POST | `/api/trips/{id}/swap` | Swap a stop for its Plan B (same day) |
-| POST | `/api/trips/{id}/feedback` | Kept / Skipped → learning update (+ re-plan on skip) |
-| POST | `/api/trips/{id}/ride-log` | Actual ride time → corridor buffer update |
-| POST | `/api/trips/{id}/reset` | Back to the original package |
-| GET / PUT | `/api/learning`, `/api/learning/weights` | Model state, judge weight sliders |
-| POST | `/api/learning/simulate` | Synthetic seeder: holdout accuracy & corridor error before/after (`apply` to persist) |
-| POST | `/api/learning/reset` | Reset learned weights and buffers |
+These mirror the REST endpoints of the backend on `main`, so moving back to a server later is a one-file change
+(`src/api.ts`).
+
+| Operation | Purpose |
+|---|---|
+| `api.meta()` | Personas, stays, trains, attractions, modes |
+| `api.createTrip(opts)` | Create a trip from a persona (+ travellers, days, budget) |
+| `api.trip(id)` | Current plan, baseline, receipt, banner, diff |
+| `api.disrupt(id, d)` | Apply train delay / weather / crowd / late start / return delay |
+| `api.swap(id, stop)` | Swap a stop for its Plan B (same day) |
+| `api.feedback(id, stop, kept/skipped)` | Learning update (+ re-plan on skip) |
+| `api.rideLog(id, ride)` | Actual ride time → corridor buffer update |
+| `api.reset(id)` | Back to the original package |
+| `api.learning()`, `api.setWeights(w)` | Model state, judge weight sliders |
+| `api.simulate(persona, apply)` | Synthetic seeder: holdout accuracy & corridor error before/after (`apply` to persist) |
+| `api.resetLearning()` | Reset learned weights and buffers |
 
 ## 4-minute demo script
 
@@ -118,7 +109,7 @@ The engine is deterministic and rule-based, so it never breaks during a demo, an
 3. **Disrupt (60 s)**: Train **+3h**. Banner: cloakroom drop, a flagship moved to Day 2, money saved, must-see kept vs a static plan. Map: grey dashed original route vs blue new route.
 4. **More real life (40 s)**: **42°C heat** swaps outdoor stops for indoor ones and AC cabs. **Day 2 +3h** drops low-value stops to protect the return train.
 5. **Plan B & learning (40 s)**: one-tap Plan B swap; mark a stop Kept/Skipped; log an actual ride time.
-6. **Judge AI (30 s)**: static vs DelayProof, weight sliders, *Run simulation*: holdout accuracy climbs (≈69% → 81%) and ride-time error drops (≈7.0 → 3.1 min).
+6. **Judge AI (30 s)**: static vs DelayProof, weight sliders, *Run simulation*: holdout accuracy climbs (Family: 53% → 86%) and ride-time error drops (7.1 → 3.2 min).
 
 ## Mock vs real
 
@@ -133,7 +124,8 @@ The engine is deterministic and rule-based, so it never breaks during a demo, an
 
 ## Roadmap
 
-1. **MVP (this build)**: Jaipur, 3 personas, rule-based engine, learning loop, Atlas persistence.
+1. **MVP (this build)**: Jaipur, 3 personas, rule-based engine, learning loop, all in the browser.
+   The `main` branch has the same engine behind a FastAPI + MongoDB Atlas backend for shared, cross-device learning.
 2. **Live data**: NTES train status, weather and fare APIs; push notification when a re-plan happens.
 3. **Booking partners**: IRCTC, hotels and ASI tickets in one checkout; free rescheduling of the station pickup.
 4. **More cities and group mode**: merge several travellers' preferences into one fair plan.
