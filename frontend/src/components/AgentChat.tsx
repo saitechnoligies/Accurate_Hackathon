@@ -59,7 +59,7 @@ export default function AgentChat({ user, trip, onTrip, onCreated, compact }: {
         <span className="chat-bot" aria-hidden>🤖</span>
         <div>
           <b>Trip assistant</b>
-          <div className="small muted">{brain === 'claude' ? 'Claude brain selected · offline rules active' : 'Offline rule brain · runs on the planning engine'}</div>
+          <div className="small muted">{brain === 'llm' ? 'LLM brain selected · offline rules active' : 'Offline rule brain · runs on the planning engine'}</div>
         </div>
       </div>
       <div className="chat-log" aria-live="polite">

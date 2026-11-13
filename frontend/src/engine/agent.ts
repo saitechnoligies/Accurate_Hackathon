@@ -1,6 +1,6 @@
 /* Offline "rule brain" for the trip assistant.
    It understands trip requests with keyword and pattern rules, fills the details it needs, and does all real work
-   through the planning engine (tools), so every answer is feasible. A Claude brain can replace parseIntent with
+   through the planning engine (tools), so every answer is feasible. An LLM brain can replace the intent rules with
    model tool calls while keeping the same tools and cards. */
 import type {
   AgentCard, AgentCreate, AgentReply, AgentState, Diet, Disruptions, Item, Mobility, PlaceCardItem, Prefs, Profile,

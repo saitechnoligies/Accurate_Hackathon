@@ -10,7 +10,7 @@ export default function PrefsModal({ user, trip, onClose, notify, onSaved, onApp
   onSaved: () => void; onApplied: (t: Trip) => void
 }) {
   const [p, setP] = useState<Prefs>({ ...user.prefs })
-  const [brain, setBrain] = useState<'offline' | 'claude'>('offline')
+  const [brain, setBrain] = useState<'offline' | 'llm'>('offline')
   const [hasKey, setHasKey] = useState(false)
   const [key, setKey] = useState('')
   const [saving, setSaving] = useState(false)
@@ -72,16 +72,16 @@ export default function PrefsModal({ user, trip, onClose, notify, onSaved, onApp
           <legend>AI assistant brain</legend>
           <div className="seg">
             <button type="button" className={brain === 'offline' ? 'on' : ''} onClick={() => setBrain('offline')}>Offline rules (active)</button>
-            <button type="button" className={brain === 'claude' ? 'on' : ''} onClick={() => setBrain('claude')}>Claude</button>
+            <button type="button" className={brain === 'llm' ? 'on' : ''} onClick={() => setBrain('llm')}>LLM (API key)</button>
           </div>
-          {brain === 'claude' && (
-            <label>Anthropic API key {hasKey && <span className="small muted">(saved)</span>}
+          {brain === 'llm' && (
+            <label>LLM API key {hasKey && <span className="small muted">(saved)</span>}
               <input type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)}
-                placeholder={api.mode === 'server' ? 'Set ANTHROPIC_API_KEY in backend/.env instead' : 'sk-ant-…'} disabled={api.mode === 'server'} />
+                placeholder={api.mode === 'server' ? 'Set LLM_API_KEY in backend/.env instead' : 'Paste your API key'} disabled={api.mode === 'server'} />
             </label>
           )}
           <p className="small muted">
-            The demo runs on the offline rule brain, which works without internet or keys. The Claude slot plugs into the same
+            The demo runs on the offline rule brain, which works without internet or keys. The LLM slot plugs into the same
             tools (plan, re-plan, swap, add, compare rides), so a model can drive the planner without inventing times or prices.
             {api.mode === 'browser' ? ' A key entered here stays in this browser only.' : ' On the server the key lives in backend/.env and never reaches the browser.'}
           </p>

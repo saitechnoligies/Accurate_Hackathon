@@ -9,7 +9,7 @@ Two branches present the same product in two ways:
 | Live sync | WebSocket per trip | BroadcastChannel between browser tabs |
 | Files | MongoDB `files` collection, served by the API | IndexedDB |
 | Calendar | `.ics` download + live subscription feed | `.ics` download |
-| AI agent | Offline rule brain on the server; Claude key slot in `backend/.env` | Offline rule brain in the browser; Claude key slot in Settings |
+| AI agent | Offline rule brain on the server; LLM key slot in `backend/.env` | Offline rule brain in the browser; LLM key slot in Settings |
 
 The screens (`frontend/src/components`) are the same on both branches. Only `src/api.ts` differs.
 
@@ -19,7 +19,7 @@ The screens (`frontend/src/components`) are the same on both branches. Only `src
    needs, shows place cards, travel-option comparisons and a full door-to-door plan preview, then creates the trip.
    Inside a trip it answers "what if my train is 2h late", "skip Jal Mahal", "add Albert Hall", "how do I get from
    Amber Fort to City Palace", "show day 2", "budget". Every answer runs through the planning engine, so plans are
-   always feasible. The brain is offline rules today; a Claude brain plugs into the same tool layer via the key slot.
+   always feasible. The brain is offline rules today; an LLM brain plugs into the same tool layer via the key slot.
 2. **Preferences.** Interests, pace, diet (any / veg / Jain), mobility (avoid stairs and long walks, cab on hills),
    avoid midday heat, day start/end, budget, travellers. Saved per user and applied to a trip (re-plans it).
 3. **Sharing & members.** Add a friend directly, or share an invite code / link. Members see everything; receipt is

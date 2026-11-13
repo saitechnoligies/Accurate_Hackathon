@@ -59,6 +59,22 @@ Asset paths are relative, so it also works from a sub-folder or opened through a
 | **Offline pocket pass**: printable itinerary with Plan Bs and helplines | 🖨️ Pocket pass | Usability |
 | **Late-night safety**: arrivals after 22:00 get a verified cab and a live-trip share note | Last transfer | Usability |
 
+### Plan together & travel companion
+
+| Feature | Where | How it works here (browser only) |
+|---|---|---|
+| **AI trip assistant** | Home + 🤖 Assistant tab | One-line requests ("family of 4, 2 days, ₹30k, veg, no long walks") become a full door-to-door plan preview; in a trip it handles "train 2h late", "it's raining", "skip / add / swap X", "how do I get from A to B", "show day 2", "budget". Every answer runs through the planner, so it cannot invent times or prices. Offline rule brain (`engine/agent.ts`); an LLM key slot is in Preferences. |
+| **Preferences** | Avatar menu → Preferences | Interests, pace, diet (any/veg/Jain), walking (limited = no stair-heavy forts, short walks, cabs on hills), stay indoors 12–16, day start/end. "Save & re-plan" rebuilds the trip around them. |
+| **Sharing & members** | 💬 Group tab | Add a friend directly or share an invite code / link (`?join=CODE`, works across tabs of this browser). A second link carries the whole trip, so it opens on any device. |
+| **Group chat & polls** | 💬 Group tab | Re-plans post themselves; "Swap X for its Plan B?" polls apply the swap on a majority yes; `@ai` answers in the thread. Tabs sync live through a BroadcastChannel. |
+| **Ticket wallet** | 🎫 Wallet | Package tickets generated from the plan with live status, plus uploaded PDFs/photos (IndexedDB, works offline). |
+| **Memories & journal** | 📸 / 📓 | Photos pinned to stops; daily journal drafted from the plan, changes and memories; private or shared. |
+| **Calendar** | 📅 Calendar | Month + day agenda and `.ics` export with alerts. (The live subscription feed needs the server: see `main`.) |
+| **Trip mode** | 🧭 Start trip mode | Now / next / leave-in countdown, the ticket you need, Running late (re-plans), Done, Skip, Plan B, Add memory, Share status, location check. |
+| **Demo identities** | Login | One click as Priya / Rohit / Ananya / Kabir, per browser tab. Two tabs = two friends on the same trip. |
+
+`main` has the same screens backed by FastAPI + MongoDB Atlas with WebSocket sync and a live calendar feed. Both branches produce identical plans (126 scenarios checked).
+
 ## How the engine works
 
 ```
@@ -68,7 +84,9 @@ frontend/src/engine/
   scheduler.ts      door-to-door planner (anchors + greedy scoring + Plan B)
   replan.ts         baseline vs re-plan diff, static-plan comparison, explanation banner, receipt
   learning.ts       online weight updates, corridor EMA, synthetic seeder + holdout evaluation
-  store.ts          the "API": trips, swaps, feedback, ride logs, learning state, saved in localStorage
+  store.ts          the "API": trips, members, chat, polls, wallet, memories, journal, learning (localStorage)
+  agent.ts          offline trip assistant: intent + detail rules that call the planner
+  users.ts / idb.ts demo identities; IndexedDB file store for photos and tickets
 ```
 
 1. **Anchors never move**: trains, hotel check-in/checkout, closing times and the return-train deadline.
@@ -102,14 +120,17 @@ These mirror the REST endpoints of the backend on `main`, so moving back to a se
 | `api.simulate(persona, apply)` | Synthetic seeder: holdout accuracy & corridor error before/after (`apply` to persist) |
 | `api.resetLearning()` | Reset learned weights and buffers |
 
-## 4-minute demo script
+## 5-minute demo script
 
-1. **Problem (30 s)**: the landing page's "domino effect" card: 3 h late → hotel detour → City Palace closed → tickets wasted.
-2. **Plan (40 s)**: click *Family Weekend*. Show the journey strip (leave home 04:35 → home 23:45) and the one-package receipt.
-3. **Disrupt (60 s)**: Train **+3h**. Banner: cloakroom drop, a flagship moved to Day 2, money saved, must-see kept vs a static plan. Map: grey dashed original route vs blue new route.
-4. **More real life (40 s)**: **42°C heat** swaps outdoor stops for indoor ones and AC cabs. **Day 2 +3h** drops low-value stops to protect the return train.
-5. **Plan B & learning (40 s)**: one-tap Plan B swap; mark a stop Kept/Skipped; log an actual ride time.
-6. **Judge AI (30 s)**: static vs DelayProof, weight sliders, *Run simulation*: holdout accuracy climbs (Family: 53% → 86%) and ride-time error drops (7.1 → 3.2 min).
+Open two tabs of the same browser side by side: tab A as **Priya**, tab B as **Rohit** (Avatar menu → Switch user).
+
+1. **Problem (20 s)**: the "domino effect" card: 3 h late → hotel detour → City Palace closed → tickets wasted.
+2. **Plan by chat (45 s)**: in A, type *"Family of 4, 2 days, ₹30k, we love history and food, no long walks for my parents"*. The plan card shows leave-home time, every stop and the all-in cost; Priya's saved veg preference is applied. *Create it*.
+3. **Plan together (40 s)**: Group tab → add Rohit. In B the trip appears. Create a Plan B swap poll; Rohit votes in B, Priya votes in A: the swap applies itself and both chats update live.
+4. **Disrupt (50 s)**: Assistant: *"our train is 3 hours late"*. Banner: cloakroom drop, a flagship moved to Day 2, money saved. The group chat and the wallet (train ticket "running 180 min late") update on their own.
+5. **Trip mode (45 s)**: start Trip mode: now / next / leave-in countdown, the ticket you need, *Running late +30* re-plans, add a memory, share status to the group.
+6. **Memories & journal (30 s)**: the memory shows on the wall; Journal → *Draft from my day* writes the day from the plan, the delay and the memory.
+7. **Judge AI (30 s)**: static vs DelayProof, weight sliders, *Run simulation*: holdout accuracy climbs (Family: 53% → 86%) and ride-time error drops (7.1 → 3.2 min).
 
 ## Mock vs real
 

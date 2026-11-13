@@ -37,7 +37,7 @@ type State = {
   tickets: Record<string, StoredTicket[]>
   memories: Record<string, StoredMemory[]>
   journal: Record<string, JournalEntry>
-  settings: { ai_brain: 'offline' | 'claude'; claude_key?: string }
+  settings: { ai_brain: 'offline' | 'llm'; llm_key?: string }
   model: { weights: Record<string, number>; tag_affinity: Record<string, Record<string, number>>; updates: number }
   corridors: Record<string, Corridor>
   feedback: { real: number; synthetic: number }
@@ -328,13 +328,13 @@ export const api = {
     save({ type: 'trips' })
     return s.users[uid]
   }),
-  settings: () => later(() => ({ ai_brain: load().settings.ai_brain, has_key: !!load().settings.claude_key })),
-  saveSettings: (ai_brain: 'offline' | 'claude', claude_key?: string) => later(() => {
+  settings: () => later(() => ({ ai_brain: load().settings.ai_brain, has_key: !!load().settings.llm_key })),
+  saveSettings: (ai_brain: 'offline' | 'llm', llm_key?: string) => later(() => {
     const s = load()
     s.settings.ai_brain = ai_brain
-    if (claude_key !== undefined) s.settings.claude_key = claude_key || undefined
+    if (llm_key !== undefined) s.settings.llm_key = llm_key || undefined
     save()
-    return { ai_brain: s.settings.ai_brain, has_key: !!s.settings.claude_key }
+    return { ai_brain: s.settings.ai_brain, has_key: !!s.settings.llm_key }
   }),
 
   // ---------------------------------------------------------------- trips
